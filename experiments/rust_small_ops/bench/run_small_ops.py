@@ -641,6 +641,7 @@ def main():
     """Run the selected sections and write the JSON."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", default=",".join(SECTIONS))
+    parser.add_argument("--out", default="small_ops.json", help="file in results/")
     parser.add_argument(
         "--skip-slow", action="store_true", help="skip the multi-minute Python runs"
     )
@@ -663,7 +664,7 @@ def main():
         results[section] = runners[section](w)
 
     RESULTS.mkdir(exist_ok=True)
-    path = RESULTS / "small_ops.json"
+    path = RESULTS / args.out
     if path.exists():  # keep sections from earlier partial runs
         previous = json.loads(path.read_text())
         previous.update(results)

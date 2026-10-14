@@ -1,0 +1,94 @@
+{
+  "environment": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "threads": 4,
+    "python": "3.13.16",
+    "numpy": "2.3.5",
+    "numba": "0.65.1",
+    "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)",
+    "date": "2026-10-14"
+  },
+  "leaf": {
+    "stock": {
+      "trace_generic, 1 ray": 0.0038850793999995405,
+      "trace, 91 rays": 0.004504389079997963,
+      "merit evaluation (optimizer._fun)": 0.0407882557999983
+    },
+    "rust leaf": {
+      "trace_generic, 1 ray": 0.0031867472500016446,
+      "trace, 91 rays": 0.0036727706299984676,
+      "merit evaluation (optimizer._fun)": 0.03475557619999563
+    }
+  },
+  "patches": {
+    "stock": {
+      "merit at new x": 0.04142975179997847,
+      "trace_generic, 1 ray": 0.003514785719999054
+    },
+    "Rust leaf": {
+      "merit at new x": 0.03486504500001501,
+      "trace_generic, 1 ray": 0.0033936924399995405
+    },
+    "build once per operation (memo scope)": {
+      "merit at new x": 0.024197985199998585,
+      "trace_generic, 1 ray": 0.003132970709998517
+    },
+    "direct backend binding": {
+      "merit at new x": 0.03446049920003134,
+      "trace_generic, 1 ray": 0.003468239090000225
+    },
+    "memo scope + backend binding": {
+      "merit at new x": 0.020576434300005532,
+      "trace_generic, 1 ray": 0.0024321981999992203
+    },
+    "all three": {
+      "merit at new x": 0.016412766749999717,
+      "trace_generic, 1 ray": 0.0021786976599992157
+    }
+  },
+  "compiled": {
+    "Optiland (shipped)": {
+      "f2": 0.0005564835420000236,
+      "trace_generic, 1 ray": 0.00375453435000054,
+      "rms_spot_size, 3 wl x 91 rays": 0.014245207400006166,
+      "merit at new x": 0.04166789139999309
+    },
+    "Optiland + Python fixes": {
+      "f2": 0.0005416833239996776,
+      "trace_generic, 1 ray": 0.0025472197599992795,
+      "rms_spot_size, 3 wl x 91 rays": 0.01003530640000463,
+      "merit at new x": 0.020572186099980173
+    },
+    "Plain Python, compiled-lens algorithm": {
+      "f2": 1.6719037650000246e-06,
+      "trace_generic, 1 ray": 2.3799923299998228e-05,
+      "rms_spot_size, 3 wl x 91 rays": 0.004793136060002325,
+      "merit at new x": 0.014146697499995753
+    },
+    "Lean NumPy, compiled-lens algorithm": {
+      "f2": 1.6927910250001333e-06,
+      "rms_spot_size, 3 wl x 91 rays": 0.0022700084699999934,
+      "merit at new x": 0.007318837140001051
+    },
+    "Numba": {
+      "f2": 7.413538760001756e-07,
+      "trace_generic, 1 ray": 2.086370810000062e-06,
+      "rms_spot_size, 3 wl x 91 rays": 0.0001701323139999431,
+      "merit at new x": 0.0005210105400001339
+    },
+    "Rust": {
+      "f2": 1.0446567049996247e-07,
+      "trace_generic, 1 ray": 9.583533939999142e-07,
+      "rms_spot_size, 3 wl x 91 rays": 0.00015377713450004648,
+      "merit at new x": 0.0004587770560001445
+    }
+  },
+  "gradient": {
+    "Optiland (shipped), sequential": 0.36595763000013903,
+    "Plain Python, sequential": 0.1142677335000144,
+    "Numba, 1 thread": 0.003891426019999926,
+    "Numba, 4 threads": 0.0011101836000000276,
+    "Rust, 1 thread": 0.003646940819999145,
+    "Rust, 4 threads": 0.0012080028850004964
+  }
+}

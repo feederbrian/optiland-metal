@@ -2,7 +2,7 @@
 
     .venv/bin/python experiments/rust_small_ops/bench/characterize.py
 
-Writes ``results/characterize.json``.
+Writes ``results/characterize.json`` (or ``--out NAME``).
 """
 
 from __future__ import annotations
@@ -166,6 +166,11 @@ def optimize_run() -> dict:
 
 def main():
     """Run every characterization and write the JSON."""
+    import argparse  # noqa: PLC0415
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--out", default="characterize.json", help="file in results/")
+    args = parser.parse_args()
     results = {}
     lens = CookeTriplet()
     wl = lens.primary_wavelength
@@ -195,7 +200,7 @@ def main():
     results["optimize"] = optimize_run()
 
     RESULTS.mkdir(exist_ok=True)
-    (RESULTS / "characterize.json").write_text(json.dumps(results, indent=2))
+    (RESULTS / args.out).write_text(json.dumps(results, indent=2))
 
 
 if __name__ == "__main__":

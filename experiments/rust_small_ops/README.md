@@ -9,6 +9,11 @@ Nothing under `optiland/` is modified. Prototype changes to Optiland are
 applied as reversible monkeypatches (`bench/patches.py`) so they can be
 measured and checked against the stock code.
 
+> **Re-checked on upstream master** (`1e05139`): the parity tests pass and
+> the conclusions hold, but upstream is now 2-3x faster on small operations,
+> so the speedups over "Optiland as shipped" below are about 2.5x smaller.
+> See [Upstream re-check](#upstream-re-check-optilandoptiland-master-1e05139-2026-10-14).
+
 ## Answer
 
 **Rust can make small operations thousands of times faster, but only if it
@@ -159,6 +164,49 @@ ends, and the good basin is found near the end. So:
   across three runs.
 * Full tables: `results/small_ops.md`. Raw data: `results/*.json`.
 
+## Upstream re-check (optiland/optiland master `1e05139`, 2026-10-14)
+
+The results further down were measured on fork commit `8bd86cf`. Upstream
+has since landed three changes aimed at the same overhead: #938 (build the
+paraxial path once per ray generation, found independently in upstream
+issue #934), #939 (cheaper path builds) and #951 (cheaper material cache
+keys). Re-run on upstream (`results/upstream_*.json`):
+
+* **All 21 parity tests still pass.** The stock tutorial optimization is
+  bit-identical across versions (626 iterations, 7,432 evaluations, final
+  merit 0.08425849520125625), so the recorded trajectory and the replays
+  still apply.
+* **Upstream is 2-3x faster on small operations:**
+
+  | Per call | Fork `8bd86cf` | Upstream `1e05139` |
+  |---|---:|---:|
+  | `paraxial.f2()` | 1.06 ms | 0.54 ms |
+  | `trace_generic`, 1 ray | 10.4 ms | 3.4 ms |
+  | merit evaluation | 101 ms | 41 ms |
+  | tutorial optimization | 805 s | 347 s |
+
+* **The remaining overhead is now mostly materials and dispatch.** In a
+  merit evaluation (119k Python calls, down from 256k): material index and
+  cache keys 27% (keys still tuple the whole wavelength array), backend
+  dispatch 16%, NumPy on tiny arrays 16%, ray physics 15%, paraxial path 8%.
+* **The prototypes still help, by less:**
+
+  | Merit evaluation on upstream | Time | vs upstream |
+  |---|---:|---:|
+  | upstream as shipped | 41.4 ms | 1x |
+  | + per-operation memo scope | 24.2 ms | 1.7x |
+  | + direct backend binding | 20.6 ms | 2.0x |
+  | + Rust leaf as well | 16.4 ms | 2.5x |
+  | Numba compiled lens | 0.52 ms | 80x |
+  | Rust compiled lens | 0.46 ms | 91x |
+
+  The tutorial optimization's work takes 3.7 s on the Rust lens and 1.3 s
+  with parallel gradients, against 347 s on upstream (94x and ~260x).
+* **The conclusions stand:** Rust and Numba are within ~10%, a Rust leaf
+  is a small gain (1.17x on upstream), and the remaining Python fixes are
+  now the material cache key (uniform-wavelength fast path) and direct
+  backend binding.
+
 ## Method
 
 ### Workload
@@ -234,6 +282,9 @@ cd ../..
 .venv/bin/python experiments/rust_small_ops/bench/multistart.py      # ~20 s
 .venv/bin/python experiments/rust_small_ops/bench/report.py
 ```
+
+Both `characterize.py` and `run_small_ops.py` take `--out NAME` to write
+to another file in `results/` (the upstream re-check used `upstream_*.json`).
 
 `run_small_ops.py --skip-slow` leaves out the multi-minute plain-Python and
 lean-NumPy replays.

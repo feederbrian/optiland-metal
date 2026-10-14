@@ -1,0 +1,85 @@
+{
+  "latency": {
+    "paraxial.EPD()": 5.465287580000222e-07,
+    "paraxial.f2()": 0.0005404166800001349,
+    "paraxial.EPL()": 0.000578093908000028,
+    "paraxial.XPL()": 0.0005378264539999691,
+    "material.n(wl)": 1.2715100399998392e-05,
+    "trace_generic, 1 ray": 0.0033885588999999073,
+    "trace, 91 rays (5-ring hexapolar)": 0.00419827696000084,
+    "updater.update()": 9.890235850002682e-07
+  },
+  "ray_scaling": [
+    {
+      "rays": 1,
+      "seconds": 0.003416173890000209
+    },
+    {
+      "rays": 7,
+      "seconds": 0.0037146059899998817
+    },
+    {
+      "rays": 37,
+      "seconds": 0.0036143360699998086
+    },
+    {
+      "rays": 331,
+      "seconds": 0.005000795599999037
+    },
+    {
+      "rays": 2791,
+      "seconds": 0.006528305619999628
+    },
+    {
+      "rays": 30301,
+      "seconds": 0.038142040399998224
+    },
+    {
+      "rays": 270901,
+      "seconds": 0.40204419999997754
+    }
+  ],
+  "merit": {
+    "problem.sum_squared() (unchanged lens)": 0.038545210799998134,
+    "optimizer._fun(x) (update + merit)": 0.04080338290000327
+  },
+  "profile": {
+    "trace_generic, 1 ray": {
+      "calls_per_invocation": 12488.05,
+      "shares": {
+        "material index + cache keys": 0.2671360990662483,
+        "real-ray physics (Python side)": 0.16622644593105443,
+        "backend dispatch (be.*)": 0.15671318178179694,
+        "NumPy (Python + C)": 0.1473810201307908,
+        "Python builtins + other": 0.13910903061613894,
+        "paraxial path + paraxial traces": 0.0796599136060211,
+        "ray generation + aiming": 0.022934569548606353,
+        "coordinate frames": 0.01690618915735157,
+        "other Optiland Python": 0.00393355016199237
+      }
+    },
+    "problem.sum_squared()": {
+      "calls_per_invocation": 118735.2,
+      "shares": {
+        "material index + cache keys": 0.26701362042113536,
+        "NumPy (Python + C)": 0.16047638210509527,
+        "backend dispatch (be.*)": 0.15565297606566417,
+        "real-ray physics (Python side)": 0.15365338557496558,
+        "Python builtins + other": 0.13297189887043137,
+        "paraxial path + paraxial traces": 0.07690014739809027,
+        "ray generation + aiming": 0.027589222572338454,
+        "coordinate frames": 0.01705059929030066,
+        "optimization bookkeeping": 0.004488011321881116,
+        "other Optiland Python": 0.004203756380097473
+      }
+    }
+  },
+  "optimize": {
+    "wall_seconds": 347.2636751770001,
+    "merit_evaluations": 7432,
+    "iterations": 626,
+    "seconds_per_evaluation": 0.04672546759647472,
+    "initial_merit": 577355.1350975751,
+    "final_merit": 0.08425849520125625
+  }
+}
