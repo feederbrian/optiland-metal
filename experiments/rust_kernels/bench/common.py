@@ -237,6 +237,8 @@ def capture_huygens_inputs(lens, num_rays: int, image_size: int, Hy: float = 1.0
 
     Wraps the strategy while a ``ScalarHuygensPSF`` is built and keeps the
     largest call (the second call computes the ideal-PSF normalization).
+    Returns ``(image, pupil, wavelength, rp, center)``; ``center`` is the
+    reference sphere center the obliquity normals point to.
     """
     calls = []
     original = hfs.NumbaSummation.compute
@@ -261,12 +263,15 @@ def capture_huygens_inputs(lens, num_rays: int, image_size: int, Hy: float = 1.0
     args = max(calls, key=lambda c: np.size(c[0]))
     image = tuple(np.ascontiguousarray(a, np.float64) for a in args[:3])
     pupil = tuple(np.ascontiguousarray(a, np.float64).ravel() for a in args[3:8])
-    return image, pupil, float(args[8]), float(args[9])
+    center = tuple(float(c) for c in np.ravel(args[10]))
+    return image, pupil, float(args[8]), float(args[9]), center
 
 
-def huygens_optiland(image, pupil, wavelength, rp) -> np.ndarray:
+def huygens_optiland(image, pupil, wavelength, rp, center) -> np.ndarray:
     """Optiland's Numba kernel, called exactly as the PSF class calls it."""
-    return hfs.NumbaSummation._huygens_fresnel_summation(*image, *pupil, wavelength, rp)
+    return hfs.NumbaSummation._huygens_fresnel_summation(
+        *image, *pupil, wavelength, rp, center
+    )
 
 
 # --------------------------------------------------------------------------

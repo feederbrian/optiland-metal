@@ -64,22 +64,28 @@ def timed(label, fn, repeats=5):
 
 def huygens_case(lens, num_rays, image_size):
     """Time every Huygens implementation on one captured Optiland input."""
-    image, pupil, wl, rp = common.capture_huygens_inputs(lens, num_rays, image_size)
+    image, pupil, wl, rp, center = common.capture_huygens_inputs(
+        lens, num_rays, image_size
+    )
     pairs = image[0].size * pupil[0].size
     print(f"\n  Huygens PSF: {image[0].shape} image x {pupil[0].size} pupil points")
-    reference = common.huygens_optiland(image, pupil, wl, rp)
+    reference = common.huygens_optiland(image, pupil, wl, rp, center)
     phase = numba_controls.max_phase(image, pupil[:3], wl)
     assert phase < numba_controls.FAST_SINCOS_LIMIT
 
     def rust(variant, parallel=True):
         return lambda: optiland_rs.huygens_psf(
-            *image, *pupil, wl, rp, variant=variant, parallel=parallel
+            *image, *pupil, wl, rp, center, variant=variant, parallel=parallel
         )
 
     impls = {
-        "optiland_numba": lambda: common.huygens_optiland(image, pupil, wl, rp),
-        "numba_hoisted": lambda: numba_controls.huygens_hoisted(*image, *pupil, wl, rp),
-        "numba_simd": lambda: numba_controls.huygens_simd(*image, *pupil, wl, rp),
+        "optiland_numba": lambda: common.huygens_optiland(image, pupil, wl, rp, center),
+        "numba_hoisted": lambda: numba_controls.huygens_hoisted(
+            *image, *pupil, wl, rp, center
+        ),
+        "numba_simd": lambda: numba_controls.huygens_simd(
+            *image, *pupil, wl, rp, center
+        ),
         "rust_literal": rust("literal"),
         "rust_hoisted": rust("hoisted"),
         "rust_simd": rust("simd"),
@@ -228,7 +234,10 @@ def _rust_huygens_kernel(*args):
     """Drop-in for ``NumbaSummation._huygens_fresnel_summation``."""
     image = (np.ascontiguousarray(a, np.float64) for a in args[:3])
     pupil = (np.ascontiguousarray(a, np.float64).ravel() for a in args[3:8])
-    return optiland_rs.huygens_psf(*image, *pupil, float(args[8]), float(args[9]))
+    center = tuple(float(c) for c in np.ravel(args[10]))
+    return optiland_rs.huygens_psf(
+        *image, *pupil, float(args[8]), float(args[9]), center
+    )
 
 
 def huygens_end_to_end(num_rays, image_size):

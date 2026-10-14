@@ -215,7 +215,9 @@ def trace_sequential(
 
 
 @njit(cache=True, parallel=True, fastmath=True, error_model="numpy")
-def huygens_hoisted(image_x, image_y, image_z, px, py, pz, amp, opd, wavelength, rp):
+def huygens_hoisted(
+    image_x, image_y, image_z, px, py, pz, amp, opd, wavelength, rp, center
+):  # fmt: skip
     """Hoisted Huygens-Fresnel sum: one complex exponential per pair."""
     k = 2.0 * np.pi / wavelength
     n = px.shape[0]
@@ -224,7 +226,10 @@ def huygens_hoisted(image_x, image_y, image_z, px, py, pz, amp, opd, wavelength,
     for j in range(n):
         wr[j] = amp[j] * math.cos(-k * opd[j])
         wi[j] = amp[j] * math.sin(-k * opd[j])
-    nx, ny, nz = px / rp, py / rp, pz / rp
+    # Inward reference-sphere normal, as in Optiland since #864.
+    nx = (center[0] - px) / rp
+    ny = (center[1] - py) / rp
+    nz = (center[2] - pz) / rp
 
     flat_x, flat_y, flat_z = image_x.ravel(), image_y.ravel(), image_z.ravel()
     out = np.empty(flat_x.shape[0])
@@ -293,7 +298,9 @@ LANES = 8
 
 
 @njit(cache=True, parallel=True, error_model="numpy", fastmath=_NO_REASSOC)
-def huygens_simd(image_x, image_y, image_z, px, py, pz, amp, opd, wavelength, rp):
+def huygens_simd(
+    image_x, image_y, image_z, px, py, pz, amp, opd, wavelength, rp, center
+):  # fmt: skip
     """Numba mirror of the Rust ``simd`` variant (8-lane accumulators)."""
     k = 2.0 * np.pi / wavelength
     n = px.shape[0]
@@ -308,7 +315,9 @@ def huygens_simd(image_x, image_y, image_z, px, py, pz, amp, opd, wavelength, rp
     for j in range(n):
         wr[j] = amp[j] * math.cos(-k * opd[j])
         wi[j] = amp[j] * math.sin(-k * opd[j])
-    nx, ny, nz = x_ / rp, y_ / rp, z_ / rp
+    nx = (center[0] - x_) / rp
+    ny = (center[1] - y_) / rp
+    nz = (center[2] - z_) / rp
 
     flat_x, flat_y, flat_z = image_x.ravel(), image_y.ravel(), image_z.ravel()
     out = np.empty(flat_x.shape[0])

@@ -7,6 +7,12 @@ This directory is self-contained. It is **not** part of the `optiland`
 package build: nothing under `optiland/` imports it, and the main
 `pyproject.toml` / `uv.lock` are unchanged.
 
+> **Upstream note (2026-10-14).** Results below were measured on fork
+> commit `8bd86cf`. On `optiland/optiland` master (`1e05139`), upstream #864
+> moved the Huygens obliquity normal to the reference-sphere center; the
+> Rust and Numba kernels here follow it (`reference_center` argument), all
+> 25 parity tests pass against upstream, and Huygens timings are unchanged.
+
 ## Answer
 
 **For the same algorithm, Rust is not faster than Numba.** The literal

@@ -68,24 +68,28 @@ def test_spherical_trace_is_bit_identical():
 @pytest.fixture(scope="module")
 def huygens_case():
     lens = common.LENSES["double_gauss"]()
-    image, pupil, wavelength, rp = common.capture_huygens_inputs(lens, num_rays=48, image_size=24)
-    return image, pupil, wavelength, rp, common.huygens_optiland(image, pupil, wavelength, rp)
+    image, pupil, wl, rp, center = common.capture_huygens_inputs(
+        lens, num_rays=48, image_size=24
+    )
+    return image, pupil, wl, rp, center, common.huygens_optiland(
+        image, pupil, wl, rp, center
+    )
 
 
 @pytest.mark.parametrize("variant", ["literal", "hoisted", "simd"])
 @pytest.mark.parametrize("parallel", [True, False])
 def test_rust_huygens_matches_optiland(huygens_case, variant, parallel):
-    image, pupil, wavelength, rp, reference = huygens_case
+    image, pupil, wavelength, rp, center, reference = huygens_case
     result = optiland_rs.huygens_psf(
-        *image, *pupil, wavelength, rp, variant=variant, parallel=parallel
+        *image, *pupil, wavelength, rp, center, variant=variant, parallel=parallel
     )
     # The reference is compiled with fastmath, so summation order differs.
     np.testing.assert_allclose(result, reference, rtol=0, atol=1e-9 * reference.max())
 
 
 def test_numba_hoisted_huygens_matches_optiland(huygens_case):
-    image, pupil, wavelength, rp, reference = huygens_case
-    result = numba_controls.huygens_hoisted(*image, *pupil, wavelength, rp)
+    image, pupil, wavelength, rp, center, reference = huygens_case
+    result = numba_controls.huygens_hoisted(*image, *pupil, wavelength, rp, center)
     np.testing.assert_allclose(result, reference, rtol=0, atol=1e-9 * reference.max())
 
 
@@ -99,19 +103,21 @@ def test_rust_fft2_matches_numpy(shape, parallel):
 
 
 def test_numba_simd_huygens_matches_optiland(huygens_case):
-    image, pupil, wavelength, rp, reference = huygens_case
+    image, pupil, wavelength, rp, center, reference = huygens_case
     # The Numba reduction (no FMA) is exact only below this phase.
     assert numba_controls.max_phase(image, pupil[:3], wavelength) < numba_controls.FAST_SINCOS_LIMIT
-    result = numba_controls.huygens_simd(*image, *pupil, wavelength, rp)
+    result = numba_controls.huygens_simd(*image, *pupil, wavelength, rp, center)
     np.testing.assert_allclose(result, reference, rtol=0, atol=1e-9 * reference.max())
 
 
 def test_mismatched_inputs_raise_instead_of_crashing():
     a, b = np.zeros((4, 4)), np.zeros(3)
     with pytest.raises(ValueError, match="pupil"):
-        optiland_rs.huygens_psf(a, a, a, b, b, b, b, np.zeros(2), 5e-4, 100.0)
+        optiland_rs.huygens_psf(a, a, a, b, b, b, b, np.zeros(2), 5e-4, 100.0, (0, 0, 0))
     with pytest.raises(ValueError, match="image"):
-        optiland_rs.huygens_psf(a, a, np.zeros((4, 3)), b, b, b, b, b, 5e-4, 100.0)
+        optiland_rs.huygens_psf(
+            a, a, np.zeros((4, 3)), b, b, b, b, b, 5e-4, 100.0, (0, 0, 0)
+        )
     rays = [np.zeros(2)] * 8
     one = np.zeros(1)
     with pytest.raises(ValueError, match="surface"):

@@ -21,7 +21,7 @@ type F64Array<'py> = Bound<'py, PyArray1<f64>>;
 #[pyfunction]
 #[pyo3(signature = (
     image_x, image_y, image_z, pupil_x, pupil_y, pupil_z, pupil_amp, pupil_opd,
-    wavelength, rp, variant = "simd", parallel = true
+    wavelength, rp, reference_center, variant = "simd", parallel = true
 ))]
 #[allow(clippy::too_many_arguments)]
 fn huygens_psf<'py>(
@@ -36,6 +36,7 @@ fn huygens_psf<'py>(
     pupil_opd: PyReadonlyArray1<'py, f64>,
     wavelength: f64,
     rp: f64,
+    reference_center: (f64, f64, f64),
     variant: &str,
     parallel: bool,
 ) -> PyResult<Bound<'py, PyArray2<f64>>> {
@@ -60,6 +61,7 @@ fn huygens_psf<'py>(
         z: pupil_z.as_slice()?,
         amp: pupil_amp.as_slice()?,
         opd: pupil_opd.as_slice()?,
+        center: reference_center,
     };
     let np = pupil.x.len();
     if [pupil.y, pupil.z, pupil.amp, pupil.opd]

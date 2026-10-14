@@ -12,6 +12,8 @@
 //!   8-lane accumulators, which lets LLVM emit AVX-512.
 //!
 //! Every variant parallelizes over image points with rayon when `parallel`.
+//! The obliquity factor uses the inward normal of the exit-pupil reference
+//! sphere, `(center - pupil point) / Rp`, as Optiland does since #864.
 
 use crate::fastmath;
 use num_complex::Complex64;
@@ -23,6 +25,8 @@ pub struct Pupil<'a> {
     pub z: &'a [f64],
     pub amp: &'a [f64],
     pub opd: &'a [f64],
+    /// Global coordinates of the reference sphere center.
+    pub center: (f64, f64, f64),
 }
 
 fn literal_point(px: f64, py: f64, pz: f64, pupil: &Pupil, k: f64, rp: f64) -> f64 {
@@ -33,7 +37,8 @@ fn literal_point(px: f64, py: f64, pz: f64, pupil: &Pupil, k: f64, rp: f64) -> f
         let r = (dx * dx + dy * dy + dz * dz).sqrt();
         let (s, c) = (k * r).sin_cos();
         let wave = Complex64::new(c, s) / r;
-        let dot = dx * (u / rp) + dy * (v / rp) + dz * (w / rp);
+        let (xc, yc, zc) = pupil.center;
+        let dot = dx * ((xc - u) / rp) + dy * ((yc - v) / rp) + dz * ((zc - w) / rp);
         let obliquity = 0.5 * (1.0 + dot / r);
         let (ps, pc) = (-k * pupil.opd[j]).sin_cos();
         sum += pupil.amp[j] * Complex64::new(pc, ps) * wave * obliquity;
@@ -68,9 +73,10 @@ impl Prepared {
             out
         };
         let (x, y, z) = (pad(pupil.x), pad(pupil.y), pad(pupil.z));
-        let nx = x.iter().map(|u| u / rp).collect();
-        let ny = y.iter().map(|v| v / rp).collect();
-        let nz = z.iter().map(|w| w / rp).collect();
+        let (xc, yc, zc) = pupil.center;
+        let nx = x.iter().map(|u| (xc - u) / rp).collect();
+        let ny = y.iter().map(|v| (yc - v) / rp).collect();
+        let nz = z.iter().map(|w| (zc - w) / rp).collect();
         let mut wr = vec![0.0; padded];
         let mut wi = vec![0.0; padded];
         for j in 0..n {
