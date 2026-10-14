@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 import optiland.backend as be
 from optiland.distribution import create_distribution
+from optiland.materials.base import frozen_materials_scope
 from optiland.rays import PolarizedRays, RayGenerator
 from optiland.raytrace.base import BaseRayTracer
 
@@ -105,8 +106,9 @@ class RealRayTracer(BaseRayTracer):
 
         # With gradients globally disabled, the whole trace runs without
         # autograd bookkeeping; with gradients enabled this context is a
-        # no-op and differentiable tracing works as before.
-        with be.no_grad_unless_enabled():
+        # no-op and differentiable tracing works as before. A trace does not
+        # change any material, so each fingerprints its state only once.
+        with be.no_grad_unless_enabled(), frozen_materials_scope():
             Hx = be.atleast_1d(Hx)
             Hy = be.atleast_1d(Hy)
 
@@ -169,7 +171,7 @@ class RealRayTracer(BaseRayTracer):
         self._validate_normalized_coordinates(Hx, Hy, "field")
         self._validate_normalized_coordinates(Px, Py, "pupil")
 
-        with be.no_grad_unless_enabled():
+        with be.no_grad_unless_enabled(), frozen_materials_scope():
             # Vignetting is applied once, in RayGenerator.generate_rays.
             # assure all variables are arrays of the same size
             Hx, Hy, Px, Py = self._validate_array_size(Hx, Hy, Px, Py)

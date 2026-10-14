@@ -204,6 +204,7 @@ class IterativeRayAimer(BaseRayAimer):
         tx: Any,
         ty: Any,
         param: LaunchParameterization | None = None,
+        ray_info: dict | None = None,
     ) -> tuple:
         """Core 2-DOF Newton/Broyden solve against an arbitrary local-stop
         target, without raising.
@@ -230,6 +231,13 @@ class IterativeRayAimer(BaseRayAimer):
             tx, ty: Target local-stop coordinates for each ray.
             param: Optional prebuilt launch parameterization; built from
                 the optic's entry frame when omitted.
+            ray_info: Optional dict filled with per-ray bookkeeping, so a
+                batch of independent solves can report each part as its own
+                solve would: ``seed_ex``/``seed_ey`` (seed residuals),
+                ``ex``/``ey`` (final residuals), ``done_at`` (the iteration
+                at whose start each ray was first converged, NaN or
+                stalled; ``max_iter`` if never) and ``ladder`` (one mask
+                per iteration of the rays that needed a Jacobian refresh).
 
         Returns:
             tuple: ``(x, y, z, L, M, N, converged, had_initial_nan,
@@ -286,11 +294,22 @@ class IterativeRayAimer(BaseRayAimer):
 
         converged = ex**2 + ey**2 < tol_sq
         self.last_iterations = 0
+        if ray_info is not None:
+            ray_info["seed_ex"] = ex
+            ray_info["seed_ey"] = ey
+            done_at = np.full(num_rays, self.max_iter)
+            ray_info["ladder"] = []
 
         for _iter_idx in range(self.max_iter):
             # Check convergence
             error_sq = ex**2 + ey**2
             converged = error_sq < tol_sq
+
+            if ray_info is not None:
+                stuck_now = be.to_numpy(
+                    be.logical_or(be.logical_or(converged, be.isnan(error_sq)), stalled)
+                ).reshape(-1)
+                done_at[stuck_now & (done_at == self.max_iter)] = _iter_idx
 
             if be.all(converged):
                 break
@@ -321,6 +340,10 @@ class IterativeRayAimer(BaseRayAimer):
                 be.logical_not(solve.valid),
                 be.logical_not(hopeless[idx]),
             )
+            if ray_info is not None:
+                ladder_rays = np.zeros(num_rays, dtype=bool)
+                ladder_rays[be.to_numpy(idx)[be.to_numpy(needs_ladder)]] = True
+                ray_info["ladder"].append(ladder_rays)
             if bool(be.any(needs_ladder)):
                 # Iteration-time conditioning ladder: (1) refresh the
                 # ill-conditioned active rays with a fresh central-difference
@@ -502,6 +525,10 @@ class IterativeRayAimer(BaseRayAimer):
         converged = ex**2 + ey**2 < tol_sq
         x, y, z, L, M, N = bound.launch(xi, eta)
         num_converged = int(be.to_numpy(converged).reshape(-1).sum())
+        if ray_info is not None:
+            ray_info["ex"] = ex
+            ray_info["ey"] = ey
+            ray_info["done_at"] = done_at
         report = SolveReport(
             seed_residual=seed_residual,
             final_residual=_max_abs_residual(ex, ey),

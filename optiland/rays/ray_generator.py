@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import optiland.backend as be
+from optiland.materials.base import frozen_materials_scope
 from optiland.paraxial_path import shared_path_scope
 from optiland.rays.polarized_rays import PolarizedRays
 from optiland.rays.ray_aiming.registry import create_ray_aimer
@@ -82,8 +83,9 @@ class RayGenerator:
         Pxv, Pyv = self.optic.fields.apply_vignetting(Hx, Hy, Px, Py)
 
         # Aim rays using the configured strategy. The aimers do not change
-        # the geometry, so all their paraxial calls can share one path.
-        with shared_path_scope(self.optic.surfaces):
+        # the geometry or the materials, so all their paraxial calls can
+        # share one path and each material fingerprints its state once.
+        with shared_path_scope(self.optic.surfaces), frozen_materials_scope():
             x0, y0, z0, L, M, N = self.aimer.aim_rays(
                 (Hx, Hy),
                 wavelength,

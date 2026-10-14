@@ -10,6 +10,8 @@ Kramer Harrison, 2024
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import hashlib
 import math
 from abc import ABC, abstractmethod
@@ -107,6 +109,41 @@ def _uniform_scalar(value) -> float | None:
         return None
     except (IndexError, TypeError, ValueError, RuntimeError):
         return None
+
+
+# While set, maps id(material) to (material, cache context, last lookups) for
+# the scope: each material's optical-state token is computed at its first
+# lookup and reused for the rest of the scope instead of being
+# re-fingerprinted at every lookup, and each property remembers its last
+# NumPy wavelength array (a copy) and result. A scope must not contain
+# material changes. It is a context variable, so a scope in one thread has
+# no effect on other threads.
+_FROZEN_STATES = contextvars.ContextVar("optiland_frozen_materials", default=None)
+
+
+@contextlib.contextmanager
+def frozen_materials_scope():
+    """Scope in which no material's optical state changes.
+
+    Ray traces and aiming solves look up refractive indices thousands of
+    times without changing any material, mostly with the same wavelength
+    array surface after surface. Inside this scope each material
+    fingerprints its state once, at its first lookup, and later lookups
+    reuse that fingerprint; a lookup whose wavelength array has the same
+    bytes, shape and dtype as the previous lookup of that property returns
+    the same result without rebuilding its cache key. Index values still
+    come from the materials' own caches, so they are exactly the values
+    computed outside a scope. Nested scopes share the outermost one. Do not
+    change a material in the scope.
+    """
+    if _FROZEN_STATES.get() is not None:
+        yield
+        return
+    token = _FROZEN_STATES.set({})
+    try:
+        yield
+    finally:
+        _FROZEN_STATES.reset(token)
 
 
 class BaseMaterial(ABC):
@@ -361,20 +398,63 @@ class BaseMaterial(ABC):
             return value.reshape(1).expand(tuple(np.shape(wavelength)))
         return np.broadcast_to(np.asarray(value).reshape(1), np.shape(wavelength))
 
+    def _current_cache_context(self) -> tuple | None:
+        """(backend context, optical-state token), or None when uncacheable."""
+        state = self._cache_state() if "_cache_state" in type(self).__dict__ else None
+        if state is None:
+            return None
+        return (self._backend_context(), state)
+
+    def _frozen_entry(self) -> tuple | None:
+        """``(material, context, last lookups)`` in a frozen scope, else None.
+
+        The context is computed once per :func:`frozen_materials_scope`.
+        """
+        frozen = _FROZEN_STATES.get()
+        if frozen is None:
+            return None
+        entry = frozen.get(id(self))
+        if entry is None:
+            # The material is kept in the entry so its id cannot be reused
+            # by another object while the scope is open.
+            entry = frozen[id(self)] = (self, self._current_cache_context(), {})
+        return entry
+
     def _evaluate_property(self, property_name: str, wavelength, **kwargs):
         """Evaluate n/k with one state-aware cache and fresh gradient graphs."""
         calculate = getattr(self, f"_calculate_{property_name}")
         if self._requires_grad(wavelength):
             return self._compute_grad_aware(calculate, wavelength, **kwargs)
-        state = self._cache_state() if "_cache_state" in type(self).__dict__ else None
+        entry = self._frozen_entry()
+        if entry is None:
+            context = self._current_cache_context()
+            last_lookups = None
+        else:
+            context = entry[1]
+            # Only plain NumPy arrays without kwargs are remembered: their
+            # bytes, shape and dtype determine the cache key completely.
+            if context is not None and not kwargs and type(wavelength) is np.ndarray:
+                last_lookups = entry[2]
+                last = last_lookups.get(property_name)
+                if (
+                    last is not None
+                    and last[0].shape == wavelength.shape
+                    and last[0].dtype == wavelength.dtype
+                    and last[0].tobytes() == wavelength.tobytes()
+                ):
+                    result = last[2]
+                    return (
+                        self._broadcast_like(result, wavelength) if last[1] else result
+                    )
+            else:
+                last_lookups = None
         kwargs_state = self._state_key(tuple(sorted(kwargs.items())))
-        if state is None or kwargs_state is None:
+        if context is None or kwargs_state is None:
             self._n_cache.clear()
             self._k_cache.clear()
             self._cache_context = None
             return self._compute_grad_aware(calculate, wavelength, **kwargs)
 
-        context = (self._backend_context(), state)
         if context != self._cache_context:
             self._n_cache.clear()
             self._k_cache.clear()
@@ -394,6 +474,8 @@ class BaseMaterial(ABC):
                 return self._broadcast_like(result, wavelength) if uniform else result
             cache[cache_key] = self._detach_if_tensor(result)
         result = cache[cache_key]
+        if last_lookups is not None:
+            last_lookups[property_name] = (np.array(wavelength), uniform, result)
         return self._broadcast_like(result, wavelength) if uniform else result
 
     def n(self, wavelength: float | be.ndarray, **kwargs) -> float | be.ndarray:

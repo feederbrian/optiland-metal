@@ -20,14 +20,20 @@ Kramer Harrison, 2026
 from __future__ import annotations
 
 import contextlib
+import pickle
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
+
+import numpy as np
 
 import optiland.backend as be
 from optiland.paraxial_path import paraxial_seed_scope
 from optiland.rays.ray_aiming.base import BaseRayAimer
-from optiland.rays.ray_aiming.initialization import get_stop_radius_strategy
-from optiland.rays.ray_aiming.iterative import IterativeRayAimer
+from optiland.rays.ray_aiming.initialization import (
+    RealReferenceStrategy,
+    get_stop_radius_strategy,
+)
+from optiland.rays.ray_aiming.iterative import IterativeRayAimer, _max_abs_residual
 from optiland.rays.ray_aiming.parameterization import (
     LaunchParameterization,
     SolveReport,
@@ -238,6 +244,62 @@ def _carry_to_seed(
     return _launch_from_seed(param, seed, offset)
 
 
+def _system_state_key(optic: Optic) -> bytes | None:
+    """Exact serialization of the state a real stop-radius solve depends on.
+
+    The serialized system is what :class:`CachedRayAimer` keys its results
+    on (surfaces, fields, wavelengths and aperture, with array contents
+    pickled rather than formatted, so no digit is lost), plus each
+    material's optical-state token, which also covers glass data that a
+    material's ``to_dict`` leaves out. ``None`` when a material's state
+    cannot be tracked or the system cannot be serialized; callers then
+    recompute instead of reusing.
+    """
+    materials: dict[int, Any] = {}
+    for surface in optic.surfaces:
+        for material in (surface.material_pre, surface.material_post):
+            materials.setdefault(id(material), material)
+    states = []
+    for material in materials.values():
+        # Inside a frozen-materials scope (every aiming call) the token was
+        # already computed for the scope's index lookups.
+        frozen = getattr(material, "_frozen_entry", lambda: None)()
+        if frozen is not None:
+            state = frozen[1]
+        elif "_cache_state" in type(material).__dict__:
+            state = material._cache_state()
+        else:
+            state = None
+        if state is None:
+            return None
+        states.append(state)
+    try:
+        return pickle.dumps(
+            (
+                be.get_backend(),
+                str(be.get_precision()),
+                optic.surfaces.to_dict(),
+                optic.fields.to_dict(),
+                optic.wavelengths.to_dict(),
+                optic.aperture.to_dict() if optic.aperture else None,
+                tuple(states),
+            )
+        )
+    except Exception:  # pragma: no cover - unpicklable custom state
+        return None
+
+
+def _group_signature(requested: tuple, Px: Any, Py: Any, wl: Any) -> tuple:
+    """Exact identity of one field's polish request: field and pupil points."""
+    arrays = (np.ascontiguousarray(be.to_numpy(a)) for a in (Px, Py, wl))
+    return (requested, tuple((a.dtype.str, a.shape, a.tobytes()) for a in arrays))
+
+
+# Visits whose polish requests are remembered for replay (see
+# RobustRayAimer._speculative_polish).
+_MAX_REPLAYS = 16
+
+
 @contextlib.contextmanager
 def _cached_paraxial_constants(optic: Optic):
     """Temporarily memoize ``Paraxial.EPD``/``EPL`` on this optic.
@@ -322,6 +384,7 @@ class RobustRayAimer(BaseRayAimer):
         max_iter: int = 20,
         tol: float = 1e-8,
         scale_fields: bool = True,
+        solve_ahead: bool = True,
         **kwargs: Any,
     ) -> None:
         """Initialize the RobustRayAimer.
@@ -332,15 +395,22 @@ class RobustRayAimer(BaseRayAimer):
             tol (float, optional): Error tolerance for convergence. Defaults to 1e-8.
             scale_fields (bool, optional): No-op, retained for backward
                 compatibility. Defaults to True.
+            solve_ahead (bool, optional): Batch the calibrations and
+                polishes of several fields when the system changes
+                (:meth:`_speculative_map`, :meth:`_speculative_polish`).
+                The results are identical either way; False solves each
+                field only when it is requested. Defaults to True.
             **kwargs: Additional keyword arguments passed to BaseRayAimer.
         """
         super().__init__(optic, **kwargs)
         self.scale_fields = scale_fields
+        self.solve_ahead = solve_ahead
         self.max_iter = max_iter
         self.tol = tol
         self._iterative = IterativeRayAimer(optic, max_iter=max_iter, tol=tol)
         self._paraxial = self._iterative._paraxial_aimer
         self._cache = PupilMapCache()
+        self._init_ahead_state()
         #: Aggregate report of the most recent :meth:`aim_rays` call. Set
         #: before raising on a total field failure, so the failure can be
         #: inspected.
@@ -430,7 +500,11 @@ class RobustRayAimer(BaseRayAimer):
 
         stop_idx = self.optic.surfaces.stop_index
         is_inf = getattr(self.optic.object_surface, "is_infinite", False)
-        r_stop = get_stop_radius_strategy(self.optic, "robust").calculate_stop_radius()
+        if "_visit_state" not in self.__dict__:
+            # An aimer assembled without __init__ (e.g. in tests).
+            self._init_ahead_state()
+        state_key = _system_state_key(self.optic)
+        r_stop = self._stop_radius(state_key)
 
         # One launch parameterization per aiming call: all solves below share
         # the same entry frame, so the local transverse basis is built once
@@ -438,6 +512,7 @@ class RobustRayAimer(BaseRayAimer):
         param = LaunchParameterization.for_optic(self.optic, bool(is_inf))
 
         self._cache.sync(self.optic)
+        self._begin_visit(state_key)
 
         # Group rays by field (D3: reuse the same pupil map across pupil
         # distributions for the same field), then process fields ordered
@@ -487,9 +562,19 @@ class RobustRayAimer(BaseRayAimer):
 
             used_cached_map = False
             calibration: _CalibrationRecord | None = None
+            cache_key = self._cache.key(Hxk, Hyk, wlk)
+            self._visit_keys.add(cache_key)
+            self._requested_as[cache_key] = key
             pmap = self._cache.get_fresh(Hxk, Hyk, wlk)
             if pmap is not None:
                 used_cached_map = True
+            elif (
+                speculated := self._speculative_map(
+                    cache_key, key, stop_idx, is_inf, r_stop, param
+                )
+            ) is not None:
+                pmap, calibration = speculated
+                self._cache.put(Hxk, Hyk, wlk, pmap)
             else:
                 seed_map = self._cache.get_stale(Hxk, Hyk, wlk)
                 if seed_map is None:
@@ -541,13 +626,17 @@ class RobustRayAimer(BaseRayAimer):
             Py_g = Py[idx]
             wl_g = wl_arr[idx]
 
-            x0, y0, z0, L0, M0, N0 = pmap.seed(Px_g, Py_g)
-            tx = Px_g * r_stop
-            ty = Py_g * r_stop
-
-            x, y, z, L, M, N, converged, _, polish = self._iterative._solve_core(
-                x0, y0, z0, L0, M0, N0, wl_g, stop_idx, is_inf, tx, ty, param=param
+            polished = self._take_polish(
+                cache_key, key, pmap, Px_g, Py_g, wl_g, stop_idx, is_inf, r_stop, param
             )
+            if polished is None:
+                x0, y0, z0, L0, M0, N0 = pmap.seed(Px_g, Py_g)
+                tx = Px_g * r_stop
+                ty = Py_g * r_stop
+                polished = self._iterative._solve_core(
+                    x0, y0, z0, L0, M0, N0, wl_g, stop_idx, is_inf, tx, ty, param=param
+                )
+            x, y, z, L, M, N, converged, _, polish = polished
 
             group_converged = int(be.to_numpy(converged).reshape(-1).sum())
             num_converged_total += group_converged
@@ -621,6 +710,434 @@ class RobustRayAimer(BaseRayAimer):
 
         _finalize_report()
         return x_out, y_out, z_out, L_out, M_out, N_out
+
+    def _stop_radius(self, key: bytes | None) -> float:
+        """Stop radius for the current system, solved once per system state.
+
+        The real marginal-ray solve behind it costs as much as dozens of
+        single-ray traces, and every aiming call needs it. It is a
+        deterministic function of the system, so the last value is reused
+        while the exact system state ``key`` (:func:`_system_state_key`) is
+        unchanged; any change, however small, solves again.
+        """
+        strategy = get_stop_radius_strategy(self.optic, "robust")
+        if not isinstance(strategy, RealReferenceStrategy):
+            return strategy.calculate_stop_radius()
+        memo = self._stop_radius_memo
+        if key is not None and memo is not None and memo[0] == key:
+            return memo[1]
+        r_stop = strategy.calculate_stop_radius()
+        self._stop_radius_memo = None if key is None else (key, r_stop)
+        return r_stop
+
+    def _init_ahead_state(self) -> None:
+        """State of the work done once per system state or ahead of request."""
+        # (system state key, stop radius) of the last real stop-radius solve.
+        self._stop_radius_memo: tuple[bytes, float] | None = None
+        # Calibration ahead of request (see :meth:`_speculative_map`). A
+        # "visit" is a run of aiming calls on one exact system state.
+        self._visit_state: Any = None
+        self._visit_keys: set = set()
+        self._last_visit_keys: set = set()
+        self._speculated: dict = {}
+        self._speculation_tried: set = set()
+        self._speculation_rounds = 0
+        # Exact (Hx, Hy, wl) of each cache key's most recent request.
+        self._requested_as: dict = {}
+        # Polish groups of this visit (signature -> request), in order; the
+        # requests of earlier visits, keyed by their first signature; and
+        # this visit's polishes solved ahead (signature -> (pmap, result)).
+        self._visit_groups: dict = {}
+        self._replays: dict = {}
+        self._polished: dict = {}
+
+    def _begin_visit(self, state_key: bytes | None) -> None:
+        """Start a new visit when the exact system state has changed."""
+        visit = None
+        if (
+            getattr(self, "solve_ahead", True)
+            and state_key is not None
+            and be.get_backend() == "numpy"
+            and be.get_precision() == 64
+        ):
+            # Solver settings are part of what a calibration depends on.
+            visit = (
+                state_key,
+                getattr(self._iterative, "max_iter", None),
+                getattr(self._iterative, "tol", None),
+            )
+        if visit is not None and visit == self._visit_state:
+            return
+        self._visit_state = visit
+        self._last_visit_keys = self._visit_keys
+        self._visit_keys = set()
+        self._speculated = {}
+        self._speculation_tried = set()
+        self._speculation_rounds = 0
+        if self._visit_groups:
+            first = next(iter(self._visit_groups))
+            self._replays.pop(first, None)
+            self._replays[first] = list(self._visit_groups.values())
+            while len(self._replays) > _MAX_REPLAYS:
+                self._replays.pop(next(iter(self._replays)))
+        self._visit_groups = {}
+        self._polished = {}
+
+    def _speculative_map(
+        self,
+        cache_key: tuple,
+        requested: tuple[float, float, float],
+        stop_idx: int,
+        is_inf: bool,
+        r_stop: float,
+        param: LaunchParameterization,
+    ) -> tuple[PupilMap, _CalibrationRecord] | None:
+        """The calibration of a stale field, computed in a batch with others.
+
+        Every field whose cached map is stale is calibrated the same way
+        when first requested: a chief solve warm-started from its stale map,
+        then four edge probes, then an affine fit. Each ray's Newton solve
+        is independent of the other rays in its batch, so the chief solves
+        (and the probe solves) of many fields can run as one batch and give
+        each field exactly the map its own calibration would (see
+        :meth:`_calibrate_batch` for the one exception). A batch costs
+        about as much as one field's calibration, because the work per ray
+        is small next to the per-surface overhead of each trace.
+
+        So the first time a stale field is requested on a system state, the
+        fields requested on the previous state are calibrated with it in
+        one batch, and the first miss after that calibrates every remaining
+        stale field. Those maps are held back and only committed to the
+        cache when their field is requested, exactly as if calibrated then:
+        until a field is requested its stale map stays the warm start other
+        fields see, and maps of fields never requested are dropped when the
+        state changes. A field whose batched solve needs a fallback is left
+        to its own calibration. Only float64 states with an exact state key
+        are calibrated ahead, on the NumPy backend (see
+        :meth:`_begin_visit`).
+
+        Returns:
+            ``(pmap, record)`` for ``requested``, or ``None`` when the
+            caller should calibrate it itself.
+        """
+        if self._visit_state is None:
+            return None
+        entry = self._speculated.pop(cache_key, None)
+        if (
+            entry is None
+            and cache_key not in self._speculation_tried
+            and self._speculation_rounds < 2
+        ):
+            stale = set(self._cache.stale_keys())
+            if self._speculation_rounds == 0:
+                others = self._last_visit_keys & stale
+            else:
+                others = stale - self._speculation_tried
+            others.discard(cache_key)
+            self._speculation_rounds += 1
+            batch = [cache_key, *sorted(others)]
+            self._speculation_tried.update(batch)
+            entries = [(k, self._requested_as.get(k)) for k in batch]
+            entries[0] = (cache_key, requested)
+            with _cached_paraxial_constants(self.optic):
+                self._speculated.update(
+                    self._calibrate_batch(entries, stop_idx, is_inf, r_stop, param)
+                )
+            entry = self._speculated.pop(cache_key, None)
+        if entry is None:
+            return None
+        calibrated_as, pmap, record = entry
+        if calibrated_as != requested:
+            return None
+        return pmap, record
+
+    def _calibrate_batch(
+        self,
+        entries: list,
+        stop_idx: int,
+        is_inf: bool,
+        r_stop: float,
+        param: LaunchParameterization,
+    ) -> dict:
+        """Warm-map calibrations of several fields with batched solves.
+
+        Each field gets the chief seed, warm start, probe targets and affine
+        fit of :meth:`_calibrate_field`; only the Newton solves are shared.
+        The solves are per ray, with one exception: a ray that needs the
+        paraxial Jacobian fallback gets it at the batch's mean wavelength.
+        A batch that used any fallback is therefore discarded whole.
+
+        Args:
+            entries: ``(cache key, (Hx, Hy, wl))`` of each field, with the
+                exact field and wavelength to calibrate it at.
+
+        Returns:
+            dict: ``cache key -> ((Hx, Hy, wl), pmap, record)`` for each
+            field calibrated without any fallback.
+        """
+        try:
+            return self._calibrate_batch_unchecked(
+                entries, stop_idx, is_inf, r_stop, param
+            )
+        except Exception:
+            # Fields calibrated ahead of their request must never fail a
+            # call; a field that fails is left to its own calibration.
+            return {}
+
+    def _calibrate_batch_unchecked(
+        self,
+        entries: list,
+        stop_idx: int,
+        is_inf: bool,
+        r_stop: float,
+        param: LaunchParameterization,
+    ) -> dict:
+        """Body of :meth:`_calibrate_batch`."""
+        prepared = []
+        for cache_key, requested in entries:
+            stale = None if requested is None else self._cache.get_stale(*requested)
+            if stale is None:
+                continue
+            Hx, Hy, wl = requested
+            try:
+                seed = self._chief_seed(Hx, Hy, be.array([wl]))
+                start = _carry_to_seed(param, seed, stale.base, stale.chief_offset)
+            except Exception:
+                continue  # the field's own calibration reports this failure
+            prepared.append((cache_key, requested, seed, start))
+        if not prepared:
+            return {}
+
+        # Chief rays, one per field, toward the stop center.
+        k = len(prepared)
+        launch = [be.concatenate([p[3][i] for p in prepared]) for i in range(6)]
+        wavelengths = be.array([p[1][2] for p in prepared])
+        zeros = be.zeros(k)
+        *state, converged, _, report = self._iterative._solve_core(
+            *launch, wavelengths, stop_idx, is_inf, zeros, zeros, param=param
+        )
+        if report.fallback_used:
+            return {}
+        converged = be.to_numpy(converged).reshape(-1)
+        state = [be.to_numpy(v).reshape(-1) for v in state]
+        chiefs = [
+            (cache_key, requested, seed, tuple(float(v[j]) for v in state))
+            for j, (cache_key, requested, seed, _start) in enumerate(prepared)
+            if converged[j]
+        ]
+        if not chiefs:
+            return {}
+
+        # Four edge probes per field, each starting at its field's chief.
+        n = len(_EDGE_PROBES)
+        launch = [
+            be.array([chief[i] for *_, chief in chiefs for _ in range(n)])
+            for i in range(6)
+        ]
+        wavelengths = be.array(
+            [requested[2] for _, requested, *_ in chiefs for _ in range(n)]
+        )
+        tx = be.array([px * r_stop for _ in chiefs for px, _ in _EDGE_PROBES])
+        ty = be.array([py * r_stop for _ in chiefs for _, py in _EDGE_PROBES])
+        *state, converged, _, report = self._iterative._solve_core(
+            *launch, wavelengths, stop_idx, is_inf, tx, ty, param=param
+        )
+        if report.fallback_used:
+            return {}
+        converged = be.to_numpy(converged).reshape(-1)
+        state = [be.to_numpy(v).reshape(-1) for v in state]
+
+        out = {}
+        for j, (cache_key, requested, seed, chief) in enumerate(chiefs):
+            probes = []
+            fallbacks = 0
+            for i in range(j * n, (j + 1) * n):
+                if converged[i]:
+                    probes.append(tuple(float(v[i]) for v in state))
+                else:
+                    # As in _solve_probes: fall back to the chief launch.
+                    probes.append(chief)
+                    fallbacks += 1
+            chief_offset = None
+            if not param.is_infinite:
+                chief_offset = _offset_from_seed(param, seed, chief)
+            pmap = self._fit_affine(chief, probes, param, chief_offset)
+            record = _CalibrationRecord(
+                chief_strategy="warm_map",
+                chief_report=None,
+                edge_probe_fallbacks=fallbacks,
+            )
+            out[cache_key] = (requested, pmap, record)
+        return out
+
+    def _take_polish(
+        self,
+        cache_key: tuple,
+        requested: tuple[float, float, float],
+        pmap: PupilMap,
+        Px_g: Any,
+        Py_g: Any,
+        wl_g: Any,
+        stop_idx: int,
+        is_inf: bool,
+        r_stop: float,
+        param: LaunchParameterization,
+    ) -> tuple | None:
+        """This field's polish, if it was solved ahead in a batch.
+
+        Records the request for replay on later visits. The first polish
+        request of a visit replays the requests of the last visit that
+        began with the same request (:meth:`_speculative_polish`).
+
+        Returns:
+            The ``_solve_core`` result tuple, or ``None`` when the caller
+            should solve it itself.
+        """
+        if self._visit_state is None or be.get_backend() != "numpy":
+            return None
+        signature = _group_signature(requested, Px_g, Py_g, wl_g)
+        if signature not in self._visit_groups:
+            first = not self._visit_groups
+            self._visit_groups[signature] = (
+                cache_key,
+                requested,
+                np.array(Px_g),
+                np.array(Py_g),
+                np.array(wl_g),
+            )
+            replay = self._replays.get(signature) if first else None
+            if replay:
+                self._speculative_polish(replay, stop_idx, is_inf, r_stop, param)
+        entry = self._polished.get(signature)
+        if entry is None or entry[0] is not pmap:
+            return None
+        return entry[1]
+
+    def _speculative_polish(
+        self,
+        replay: list,
+        stop_idx: int,
+        is_inf: bool,
+        r_stop: float,
+        param: LaunchParameterization,
+    ) -> None:
+        """Polish a remembered visit's requests in batches, ahead of request.
+
+        The polish of one field's pupil points is a per-ray Newton solve
+        from that field's map, so polishes of many fields batch exactly
+        like calibrations (:meth:`_speculative_map`), as long as the batch
+        shares the finite-difference step scale, which depends on the
+        largest target in a solve. Requests are grouped by it (and by
+        wavelength, which keeps index lookups cheap). Each result
+        is kept with the map it was seeded from and served only to a
+        request with the same field, pupil points and wavelengths whose
+        map is that same object; anything else is solved on request.
+        """
+        try:
+            self._speculative_polish_unchecked(replay, stop_idx, is_inf, r_stop, param)
+        except Exception:
+            # Work done ahead of a request must never fail a call.
+            self._polished = {}
+
+    def _speculative_polish_unchecked(
+        self,
+        replay: list,
+        stop_idx: int,
+        is_inf: bool,
+        r_stop: float,
+        param: LaunchParameterization,
+    ) -> None:
+        """Body of :meth:`_speculative_polish`."""
+        # Calibrate, ahead as well, the stale fields of the replayed visit.
+        missing = {}
+        for cache_key, requested, *_ in replay:
+            if (
+                cache_key not in self._speculated
+                and cache_key not in self._speculation_tried
+                and self._cache.get_fresh(*requested) is None
+                and self._cache.get_stale(*requested) is not None
+            ):
+                missing.setdefault(cache_key, requested)
+        if missing:
+            self._speculation_tried.update(missing)
+            with _cached_paraxial_constants(self.optic):
+                self._speculated.update(
+                    self._calibrate_batch(
+                        list(missing.items()), stop_idx, is_inf, r_stop, param
+                    )
+                )
+
+        by_scale: dict[tuple, list] = {}
+        for cache_key, requested, Px_g, Py_g, wl_g in replay:
+            signature = _group_signature(requested, Px_g, Py_g, wl_g)
+            if signature in self._polished:
+                continue
+            pmap = self._cache.get_fresh(*requested)
+            if pmap is None:
+                speculated = self._speculated.get(cache_key)
+                if speculated is None or speculated[0] != requested:
+                    continue
+                pmap = speculated[1]
+            Px_b, Py_b, wl_b = (be.array(v) for v in (Px_g, Py_g, wl_g))
+            tx = Px_b * r_stop
+            ty = Py_b * r_stop
+            scale = self._iterative._fd_step_scale(is_inf, tx, ty)
+            # One wavelength per batch keeps every index lookup a single
+            # cached value instead of a lookup keyed on a mixed array.
+            by_scale.setdefault((scale, requested[2]), []).append(
+                (signature, pmap, Px_b, Py_b, wl_b, tx, ty)
+            )
+        for jobs in by_scale.values():
+            self._polish_batch(jobs, stop_idx, is_inf, param)
+
+    def _polish_batch(
+        self, jobs: list, stop_idx: int, is_inf: bool, param: LaunchParameterization
+    ) -> None:
+        """One batched polish; per-request results and reports into ``_polished``."""
+        seeds = [pmap.seed(Px_b, Py_b) for _, pmap, Px_b, Py_b, *_ in jobs]
+        launch = [be.concatenate([seed[i] for seed in seeds]) for i in range(6)]
+        wl = be.concatenate([job[4] for job in jobs])
+        tx = be.concatenate([job[5] for job in jobs])
+        ty = be.concatenate([job[6] for job in jobs])
+        info: dict = {}
+        *state, converged, _, report = self._iterative._solve_core(
+            *launch, wl, stop_idx, is_inf, tx, ty, param=param, ray_info=info
+        )
+        if report.fallback_used:
+            # A paraxial fallback depends on the batch's mean wavelength.
+            return
+        converged_np = be.to_numpy(converged).reshape(-1)
+        seed_ex = be.to_numpy(info["seed_ex"]).reshape(-1)
+        seed_ey = be.to_numpy(info["seed_ey"]).reshape(-1)
+        start = 0
+        for signature, pmap, Px_b, *_ in jobs:
+            stop = start + len(Px_b)
+            part = slice(start, stop)
+            had_initial_nan = bool(
+                np.isnan(seed_ex[part]).any() or np.isnan(seed_ey[part]).any()
+            )
+            part_report = SolveReport(
+                seed_residual=_max_abs_residual(
+                    info["seed_ex"][part], info["seed_ey"][part]
+                ),
+                final_residual=_max_abs_residual(info["ex"][part], info["ey"][part]),
+                converged=bool(converged_np[part].all()),
+                iterations=int(info["done_at"][part].max()),
+                num_rays=stop - start,
+                num_converged=int(converged_np[part].sum()),
+                fallback_used=False,
+                jacobian_refreshes=sum(
+                    bool(mask[part].any()) for mask in info["ladder"]
+                ),
+            )
+            result = (
+                *(v[part] for v in state),
+                converged[part],
+                had_initial_nan,
+                part_report,
+            )
+            self._polished[signature] = (pmap, result)
+            start = stop
 
     def _report_for_initial_guess(
         self, fields: tuple, wavelengths: Any

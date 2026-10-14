@@ -128,8 +128,10 @@ class EvenAsphere(NewtonRaphsonGeometry):
         dfdy = y / denom
 
         for i, Ci in enumerate(self.coefficients):
-            dfdx = dfdx + 2 * (i + 1) * x * Ci * r2**i
-            dfdy = dfdy + 2 * (i + 1) * y * Ci * r2**i
+            # One power per term, shared by both slopes (same values).
+            r2_i = r2**i
+            dfdx = dfdx + 2 * (i + 1) * x * Ci * r2_i
+            dfdy = dfdy + 2 * (i + 1) * y * Ci * r2_i
 
         mag = be.sqrt(dfdx**2 + dfdy**2 + 1)
 

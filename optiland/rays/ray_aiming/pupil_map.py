@@ -155,6 +155,17 @@ class PupilMapCache:
         )
         return self._store[best_key]
 
+    def key(self, Hx: float, Hy: float, wl: float) -> tuple[float, float, float]:
+        """The cache key ``(Hx, Hy, wl)`` is stored under."""
+        return self._key(Hx, Hy, wl)
+
+    def stale_keys(self) -> list[tuple[float, float, float]]:
+        """Keys whose stored map predates the current fingerprint."""
+        current = self._current_fingerprint
+        return [
+            key for key in self._store if self._fingerprint_at_store.get(key) != current
+        ]
+
     def put(self, Hx: float, Hy: float, wl: float, pmap: PupilMap) -> None:
         key = self._key(Hx, Hy, wl)
         self._store[key] = pmap
