@@ -183,6 +183,59 @@ and none of the five does.
   tolerance level. If that is ever acceptable, stock's own history noise
   of about 1e-11 waves is the bar to compare against.
 
+## How far could a compiled path go?
+
+The small-operations experiment reached 600-690x on the triplet tutorial.
+That figure combines two things: about 200x from compiling the whole merit,
+and about 3x from running the gradient's evaluations in parallel on 4
+cores, both measured against serial stock Optiland. This pipeline already
+runs its Jacobian on 6 workers, so only the compile factor is still
+available. On this lens it is bounded by the arithmetic:
+
+* **Work per merit evaluation** (`bench/count_work.py`, proxy merit after
+  a step): 2.77 million ray-surface intersections. 2.22 million of them
+  are in the aimer's internal traces and 0.55 million in the operands' own
+  traces, plus 2.2 million even-asphere Newton residuals.
+* **Cost per intersection in compiled code** (`bench/compiled_floor.py`):
+  110 ns on one core and 29 ns on four. That is the average over all 31
+  surfaces, including 6 aspheres solved by the same conic-seeded Newton
+  iteration Optiland uses, with refraction. The kernel's image-plane rays
+  match Optiland's to 1.2e-13.
+
+| Merit evaluation after a step, one core | Time | vs stock | vs this branch |
+|---|---:|---:|---:|
+| Stock | 17.6 s | 1x | |
+| This branch | 6.8 s | 2.6x | 1x |
+| Compiled, same algorithm (floor: 2.77M x 110 ns) | ~0.30 s | ~58x | ~22x |
+| Compiled, lean aimer (estimate) | ~0.15 s | ~115x | ~45x |
+
+The "lean aimer" row is an estimate. It assumes each of the ~18,000
+operand rays is solved at the stop from the previous step's launch in
+about 3 traces to the stop, rather than through calibrations, central
+differences and line searches. Two things push the real figure below
+these numbers. Everything not ported (the pipeline's own operand code,
+the geometric constraints, worker communication) does not shrink, and at
+0.15 s per evaluation even 50 ms of it matters. The proxy also has no MTF
+operands, which the pipeline has. Two things could push it up.
+Forward-mode derivatives inside the compiled trace could replace the 8
+finite-difference columns of a block step, about 1.4x per step, since 8
+of the 15 evaluations per step are Jacobian columns. Freed cores could
+also go to threads within an evaluation.
+
+**So the realistic ceiling is roughly 50-120x over stock per evaluation,
+not 600x**, because the parallel share is already in the baseline and this
+lens does 2.77 million real intersections per merit. The triplet's merit
+did a few thousand.
+
+A compiled path also cannot be bit-identical. It would agree with
+Optiland to about 1e-9 or better per operand. The triplet experiment
+showed what that means for a whole optimization: runs that agreed to
+1e-12 on every merit still ended in different local minima. Plan on
+re-scoring final designs in Optiland, and on multi-start. It would also
+need the pipeline's operand definitions, MTF and the decentered
+sensitivity states, plus its backward-ray and off-surface rules, each
+with parity tests against Optiland.
+
 ## Next steps, best value first
 
 1. **Run the pipeline on this branch.** Nothing in the pipeline has to
