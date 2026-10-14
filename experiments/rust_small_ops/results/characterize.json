@@ -1,0 +1,85 @@
+{
+  "latency": {
+    "paraxial.EPD()": 5.534043719999318e-07,
+    "paraxial.f2()": 0.001063656879998689,
+    "paraxial.EPL()": 0.001087505120001424,
+    "paraxial.XPL()": 0.0010373323750013696,
+    "material.n(wl)": 2.3813493999978162e-05,
+    "trace_generic, 1 ray": 0.01034624155001893,
+    "trace, 91 rays (5-ring hexapolar)": 0.010742815399999018,
+    "updater.update()": 1.0574354549999043e-06
+  },
+  "ray_scaling": [
+    {
+      "rays": 1,
+      "seconds": 0.010468479799988018
+    },
+    {
+      "rays": 7,
+      "seconds": 0.010052336849980748
+    },
+    {
+      "rays": 37,
+      "seconds": 0.0099653307500148
+    },
+    {
+      "rays": 331,
+      "seconds": 0.012503005549979207
+    },
+    {
+      "rays": 2791,
+      "seconds": 0.015091952550005772
+    },
+    {
+      "rays": 30301,
+      "seconds": 0.04706520340005227
+    },
+    {
+      "rays": 270901,
+      "seconds": 0.38790849199995137
+    }
+  ],
+  "merit": {
+    "problem.sum_squared() (unchanged lens)": 0.0970174419999239,
+    "optimizer._fun(x) (update + merit)": 0.10345855100013068
+  },
+  "profile": {
+    "trace_generic, 1 ray": {
+      "calls_per_invocation": 27812.05,
+      "shares": {
+        "NumPy (Python + C)": 0.23097274286264322,
+        "paraxial path + paraxial traces": 0.19580537424663225,
+        "backend dispatch (be.*)": 0.1816990474832608,
+        "Python builtins + other": 0.13524701779808707,
+        "material index + cache keys": 0.12539741355355635,
+        "real-ray physics (Python side)": 0.07988154590082529,
+        "coordinate frames": 0.03370995969595669,
+        "ray generation + aiming": 0.01490278175418449,
+        "other Optiland Python": 0.002384116704853429
+      }
+    },
+    "problem.sum_squared()": {
+      "calls_per_invocation": 256407.2,
+      "shares": {
+        "NumPy (Python + C)": 0.22803395406851923,
+        "paraxial path + paraxial traces": 0.19181189442676,
+        "backend dispatch (be.*)": 0.1861970878913072,
+        "material index + cache keys": 0.13214841040725453,
+        "Python builtins + other": 0.1319057519515714,
+        "real-ray physics (Python side)": 0.07733686680308277,
+        "coordinate frames": 0.0322341204688378,
+        "ray generation + aiming": 0.01582159038236309,
+        "other Optiland Python": 0.002456074139686765,
+        "optimization bookkeeping": 0.0020542494606168643
+      }
+    }
+  },
+  "optimize": {
+    "wall_seconds": 804.8508431159999,
+    "merit_evaluations": 7432,
+    "iterations": 626,
+    "seconds_per_evaluation": 0.10829532334714745,
+    "initial_merit": 577355.1350975751,
+    "final_merit": 0.08425849520125625
+  }
+}

@@ -1,0 +1,20 @@
+[package]
+name = "optiland_small"
+version = "0.1.0"
+edition = "2021"
+description = "Experiment: can Rust speed up Optiland's small, overhead-bound operations?"
+publish = false
+
+[lib]
+name = "optiland_small"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = "0.29.3"
+numpy = "0.29.0"
+rayon = "1.12.0"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
