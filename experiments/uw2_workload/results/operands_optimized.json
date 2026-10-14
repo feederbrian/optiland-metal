@@ -1,0 +1,9 @@
+{
+ "wave (u=0.7, F line) [fresh]": 0.02958096700058377,
+ "wave (u=0.7, F line) [perturbed]": 0.1716072780000104,
+ "chief (u=1) [fresh]": 0.01270856500013906,
+ "chief (u=1) [perturbed]": 0.13586954699985654,
+ "spot (u=0.7, 5 wavelengths) [fresh]": 0.06776532099956967,
+ "spot (u=0.7, 5 wavelengths) [perturbed]": 0.42417314700014686,
+ "merit [perturbed]": 6.791523531000166
+}
