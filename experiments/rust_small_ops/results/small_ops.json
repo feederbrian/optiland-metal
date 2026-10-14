@@ -1,0 +1,225 @@
+{
+  "environment": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "threads": 4,
+    "python": "3.13.16",
+    "numpy": "2.3.5",
+    "numba": "0.65.1",
+    "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)",
+    "date": "2026-10-14"
+  },
+  "boundary": {
+    "Python function, no args": 2.5605957900006617e-08,
+    "Python function, 3 floats": 6.84703091999836e-08,
+    "Rust (PyO3), no args": 3.617796999997154e-08,
+    "Rust (PyO3), 3 floats": 9.252367249973758e-08,
+    "Rust (PyO3), 8 arrays of 1 in, 8 out": 1.921982599997136e-06,
+    "Rust (PyO3), 8 arrays of 91 in, 8 out": 2.101861329992971e-06,
+    "Numba, no args": 4.045438720004313e-08,
+    "Numba, 3 floats": 1.9327013200017974e-07,
+    "Numba, 8 arrays of 1 in, 8 out": 5.393094600003679e-06,
+    "Numba, 8 arrays of 91 in, 8 out": 5.286775860004127e-06,
+    "NumPy a + b, 1 element": 4.7389484199993605e-07,
+    "NumPy np.sqrt(a), 1 element": 4.870440020004026e-07,
+    "Optiland be.sqrt(a), 1 element": 1.2484593900080653e-06,
+    "math.sqrt(x), Python float": 4.713373140002659e-08
+  },
+  "leaf": {
+    "stock": {
+      "trace_generic, 1 ray": 0.010491480759992556,
+      "trace, 91 rays": 0.010635272550007357,
+      "merit evaluation (optimizer._fun)": 0.10546985700011646
+    },
+    "rust leaf": {
+      "trace_generic, 1 ray": 0.009304580500020166,
+      "trace, 91 rays": 0.010053515050003625,
+      "merit evaluation (optimizer._fun)": 0.09203240780007035
+    }
+  },
+  "compiled": {
+    "Optiland (shipped)": {
+      "f2": 0.0010889859899998555,
+      "trace_generic, 1 ray": 0.010065818199973365,
+      "rms_spot_size, 3 wl x 91 rays": 0.032598650399995675,
+      "merit at new x": 0.10362370999991981
+    },
+    "Optiland + Python fixes": {
+      "f2": 0.000865138445001321,
+      "trace_generic, 1 ray": 0.0037478493500020704,
+      "rms_spot_size, 3 wl x 91 rays": 0.014693267650000053,
+      "merit at new x": 0.02364073250000729
+    },
+    "Plain Python, compiled-lens algorithm": {
+      "f2": 1.7813809549988947e-06,
+      "trace_generic, 1 ray": 2.1958103500037397e-05,
+      "rms_spot_size, 3 wl x 91 rays": 0.004498520600009215,
+      "merit at new x": 0.013452736599992932
+    },
+    "Lean NumPy, compiled-lens algorithm": {
+      "f2": 1.6667763450004713e-06,
+      "rms_spot_size, 3 wl x 91 rays": 0.0024044865399991977,
+      "merit at new x": 0.0068593060800048984
+    },
+    "Numba": {
+      "f2": 7.024987120003061e-07,
+      "trace_generic, 1 ray": 2.0680688100037514e-06,
+      "rms_spot_size, 3 wl x 91 rays": 0.00017815090000021882,
+      "merit at new x": 0.0004965929859990865
+    },
+    "Rust": {
+      "f2": 1.0541666899962365e-07,
+      "trace_generic, 1 ray": 9.29086414998892e-07,
+      "rms_spot_size, 3 wl x 91 rays": 0.00015599213350014907,
+      "merit at new x": 0.00046118584600117176
+    }
+  },
+  "gradient": {
+    "Optiland (shipped), sequential": 0.8277595680001468,
+    "Plain Python, sequential": 0.11766018199978134,
+    "Numba, 1 thread": 0.003926511569998184,
+    "Numba, 4 threads": 0.0010605047999979434,
+    "Rust, 1 thread": 0.003707357379998939,
+    "Rust, 4 threads": 0.0011731206700005715
+  },
+  "optimize": {
+    "replay": {
+      "Optiland (shipped)": 804.8508431159999,
+      "Optiland + Python fixes": 200.58111488899976,
+      "Plain Python, compiled-lens algorithm": 113.33937588899971,
+      "Lean NumPy, compiled-lens algorithm": 58.92219012800069,
+      "Numba": 4.009382398999151,
+      "Rust": 3.731647886999781,
+      "Numba, gradient batches in parallel (4 threads)": 1.1608577570004854,
+      "Rust, gradient batches in parallel (4 threads)": 1.337384714000109
+    },
+    "free_running": {
+      "Numba": {
+        "wall_seconds": 2.750762226000006,
+        "merit_evaluations": 4264,
+        "iterations": 354,
+        "final_merit": 0.8146186947055122,
+        "rescored_merit": 0.8146186947055223
+      },
+      "Rust": {
+        "wall_seconds": 2.435493736999888,
+        "merit_evaluations": 4264,
+        "iterations": 354,
+        "final_merit": 0.8146186947055122,
+        "rescored_merit": 0.8146186947055223
+      },
+      "Numba + parallel gradient (4 threads)": {
+        "wall_seconds": 0.7291087559997322,
+        "merit_evaluations": 4264,
+        "iterations": 354,
+        "final_merit": 0.8146186947055122,
+        "rescored_merit": 0.8146186947055223
+      },
+      "Rust + parallel gradient (4 threads)": {
+        "wall_seconds": 0.8979278960005104,
+        "merit_evaluations": 4264,
+        "iterations": 354,
+        "final_merit": 0.8146186947055122,
+        "rescored_merit": 0.8146186947055223
+      }
+    },
+    "trajectory": {
+      "merit_evaluations": 7432,
+      "iterations": 626,
+      "final_merit": 0.08425849520125625,
+      "evaluations_to_within": {
+        "1": 6865,
+        "0.1": 6977,
+        "0.01": 7161,
+        "0.001": 7201
+      }
+    }
+  },
+  "options": {
+    "lsq_optiland": {
+      "wall_seconds": 534.3231578549994,
+      "merit_evaluations": 4928,
+      "rescored_merit": 8.114805357766382
+    },
+    "lsq_optiland_fixes": {
+      "wall_seconds": 222.74211143699995,
+      "merit_evaluations": 4928,
+      "rescored_merit": 8.114805357766382
+    },
+    "lsq_rust": {
+      "wall_seconds": 3.040100531000462,
+      "merit_evaluations": 4998,
+      "rescored_merit": 8.078525799561831
+    },
+    "lsq_rust_batched": {
+      "wall_seconds": 1.7920846360002542,
+      "merit_evaluations": 5612,
+      "rescored_merit": 8.078525799561831
+    },
+    "fd_processes": {
+      "wall_seconds": 254.22152473999995,
+      "merit_evaluations": 7432,
+      "rescored_merit": 0.08425849520125625
+    },
+    "fd_processes_fixes": {
+      "wall_seconds": 70.05484046799938,
+      "merit_evaluations": 7432,
+      "rescored_merit": 0.08425849520125625
+    }
+  },
+  "multistart": {
+    "starts": 32,
+    "sigma": 0.1,
+    "threads": 4,
+    "wall_seconds": 16.470683532000294,
+    "best_merit": 0.08425851280106253,
+    "best_rescored_by_optiland": 0.08425851280106449,
+    "median_merit": 1.0745451522861633,
+    "share_better_than_stock": 0.0,
+    "best_x": [
+      -0.8014729761862083,
+      9.0,
+      -1.3688865006099236,
+      -0.826676703662255,
+      -0.5729329699995238,
+      -1.275948557129182,
+      2.7792513582667615
+    ],
+    "stock_final_merit": 0.08425849520125625
+  },
+  "patches": {
+    "stock": {
+      "merit at new x": 0.10086205649986368,
+      "trace_generic, 1 ray": 0.009610103149998394
+    },
+    "Rust leaf": {
+      "merit at new x": 0.08909421019998262,
+      "trace_generic, 1 ray": 0.010182581359986216
+    },
+    "build once per operation (memo scope)": {
+      "merit at new x": 0.028538605999892754,
+      "trace_generic, 1 ray": 0.004613566259995423
+    },
+    "direct backend binding": {
+      "merit at new x": 0.08479382450013873,
+      "trace_generic, 1 ray": 0.0089880505399924
+    },
+    "memo scope + backend binding": {
+      "merit at new x": 0.026325158500003453,
+      "trace_generic, 1 ray": 0.003754279670001779
+    },
+    "all three": {
+      "merit at new x": 0.019876078400011467,
+      "trace_generic, 1 ray": 0.00338766427000337
+    }
+  },
+  "blas": {
+    "OPENBLAS_NUM_THREADS=4": {
+      "Rust": 2.422858737999377,
+      "Numba": 4.799026186000447
+    },
+    "OPENBLAS_NUM_THREADS=1": {
+      "Rust": 0.898850336000578,
+      "Numba": 0.8072816220001187
+    }
+  }
+}

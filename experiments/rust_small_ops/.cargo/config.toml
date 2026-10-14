@@ -1,0 +1,4 @@
+# Numba JIT-compiles for the host CPU, so the Rust side does the same to keep
+# the comparison fair. Remove this for a portable wheel.
+[build]
+rustflags = ["-C", "target-cpu=native"]
