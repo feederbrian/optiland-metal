@@ -1,0 +1,13 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "optiland_rs"
+version = "0.1.0"
+description = "Experimental Rust ports of Optiland's heaviest numerical kernels"
+requires-python = ">=3.11"
+dependencies = ["numpy"]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]

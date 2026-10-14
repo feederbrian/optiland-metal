@@ -1,0 +1,12 @@
+{
+  "rays": 999289,
+  "threading_layer": "omp",
+  "seconds": {
+    "numba_fused@1t": 1.2905954620000557,
+    "numba_fused@4t chunk=0": 0.3851384380000127,
+    "numba_fused@4t chunk=4096": 0.3582139760001155,
+    "numba_fused@4t chunk=256": 0.3625626289999673,
+    "rust_fused@1t": 1.3283551449999322,
+    "rust_fused@4t": 0.34010740499979875
+  }
+}
