@@ -1,0 +1,65 @@
+{
+  "lens.trace, 205k rays": {
+    "wall_seconds": 0.44381723900005454,
+    "shares": {
+      "real-ray surface loop": 0.7487311321793139,
+      "Huygens summation": 0.0,
+      "FFT": 0.0,
+      "Python orchestration + other": 0.25126886782068614
+    }
+  },
+  "SpotDiagram (3 fields x 3 wl)": {
+    "wall_seconds": 0.2699237470001208,
+    "shares": {
+      "real-ray surface loop": 0.2841309902880915,
+      "Huygens summation": 0.0,
+      "FFT": 0.0,
+      "Python orchestration + other": 0.7158690097119085
+    }
+  },
+  "OPD map": {
+    "wall_seconds": 0.04843203799964613,
+    "shares": {
+      "real-ray surface loop": 0.228519481731621,
+      "Huygens summation": 0.0,
+      "FFT": 0.0,
+      "Python orchestration + other": 0.771480518268379
+    }
+  },
+  "GeometricMTF": {
+    "wall_seconds": 0.17375268899968432,
+    "shares": {
+      "real-ray surface loop": 0.2261935660185233,
+      "Huygens summation": 0.0,
+      "FFT": 0.0,
+      "Python orchestration + other": 0.7738064339814767
+    }
+  },
+  "FFTPSF 256 rays, 1024 grid": {
+    "wall_seconds": 0.1916196789998139,
+    "shares": {
+      "real-ray surface loop": 0.3186904402962001,
+      "Huygens summation": 0.0,
+      "FFT": 0.11283072403463375,
+      "Python orchestration + other": 0.5684788356691661
+    }
+  },
+  "FFTMTF 256 rays, 1024 grid": {
+    "wall_seconds": 0.9279676210003345,
+    "shares": {
+      "real-ray surface loop": 0.2810805649253663,
+      "Huygens summation": 0.0,
+      "FFT": 0.12427274631448994,
+      "Python orchestration + other": 0.5946466887601438
+    }
+  },
+  "HuygensPSF 128 rays, 128 px": {
+    "wall_seconds": 3.298029406999831,
+    "shares": {
+      "real-ray surface loop": 0.03372970802779455,
+      "Huygens summation": 0.8768029670371112,
+      "FFT": 0.0,
+      "Python orchestration + other": 0.08946732493509424
+    }
+  }
+}

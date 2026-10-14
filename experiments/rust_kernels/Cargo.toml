@@ -1,0 +1,22 @@
+[package]
+name = "optiland_rs"
+version = "0.1.0"
+edition = "2021"
+description = "Experimental Rust ports of Optiland's heaviest numerical kernels"
+publish = false
+
+[lib]
+name = "optiland_rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = "0.29.3"
+numpy = "0.29.0"
+rayon = "1.12.0"
+num-complex = "0.4"
+rustfft = "6.4.1"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

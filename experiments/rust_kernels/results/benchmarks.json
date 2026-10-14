@@ -1,0 +1,264 @@
+{
+  "environment": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "threads": 4,
+    "python": "3.13.16",
+    "numpy": "2.3.5",
+    "scipy": "1.16.3",
+    "numba": "0.65.1",
+    "numba_svml": false,
+    "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)",
+    "date": "2026-10-14"
+  },
+  "huygens": [
+    {
+      "image": [
+        64,
+        64
+      ],
+      "pupil_points": 3096,
+      "pairs": 12681216,
+      "max_phase_rad": 1304285.3737036702,
+      "seconds": {
+        "optiland_numba@4t": 0.21729347799987409,
+        "numba_hoisted@4t": 0.06256336399997053,
+        "numba_simd@4t": 0.05369463500005622,
+        "rust_literal@4t": 0.19188148599982924,
+        "rust_hoisted@4t": 0.08816206200003762,
+        "rust_simd@4t": 0.039277752000089095,
+        "optiland_numba@1t": 0.7567393339998034,
+        "numba_hoisted@1t": 0.24343647499995313,
+        "numba_simd@1t": 0.21103647399991132,
+        "rust_literal@1t": 0.7378613999999288,
+        "rust_simd@1t": 0.1660711040001388
+      }
+    },
+    {
+      "image": [
+        128,
+        128
+      ],
+      "pupil_points": 12644,
+      "pairs": 207159296,
+      "max_phase_rad": 1305189.7131331551,
+      "seconds": {
+        "optiland_numba@4t": 2.8379264699999567,
+        "numba_hoisted@4t": 1.249839791000113,
+        "numba_simd@4t": 1.142534828999942,
+        "rust_literal@4t": 2.9639343989999816,
+        "rust_hoisted@4t": 1.417255243999989,
+        "rust_simd@4t": 0.6744281690000662,
+        "optiland_numba@1t": 10.892174751000084,
+        "numba_hoisted@1t": 3.8486856790000274,
+        "numba_simd@1t": 3.722401561000197,
+        "rust_literal@1t": 11.474584375999939,
+        "rust_simd@1t": 2.6439676360000703
+      }
+    }
+  ],
+  "trace": [
+    {
+      "lens": "double_gauss",
+      "rays": 952,
+      "surfaces": 12,
+      "seconds": {
+        "optiland_numpy@1t": 0.009245600999975068,
+        "numba_fused@1t": 0.0007184149999375222,
+        "numba_fused@4t": 0.0002180839999255113,
+        "rust_fused@1t": 0.0007054329998936737,
+        "rust_fused@4t": 0.000493949999963661
+      }
+    },
+    {
+      "lens": "double_gauss",
+      "rays": 9845,
+      "surfaces": 12,
+      "seconds": {
+        "optiland_numpy@1t": 0.011417114999858313,
+        "numba_fused@1t": 0.007548403999862785,
+        "numba_fused@4t": 0.0022475069999927655,
+        "rust_fused@1t": 0.0073677840000527794,
+        "rust_fused@4t": 0.0025375840000378957
+      }
+    },
+    {
+      "lens": "double_gauss",
+      "rays": 99477,
+      "surfaces": 12,
+      "seconds": {
+        "optiland_numpy@1t": 0.13665230899982816,
+        "numba_fused@1t": 0.07583870600001319,
+        "numba_fused@4t": 0.021320639999885316,
+        "rust_fused@1t": 0.07479265200004193,
+        "rust_fused@4t": 0.019937621000053696
+      }
+    },
+    {
+      "lens": "double_gauss",
+      "rays": 999289,
+      "surfaces": 12,
+      "seconds": {
+        "optiland_numpy@1t": 1.8030081119998158,
+        "numba_fused@1t": 0.7842497899998762,
+        "numba_fused@4t": 0.2097969210001338,
+        "rust_fused@1t": 0.7612643659999776,
+        "rust_fused@4t": 0.20469956500005537
+      }
+    },
+    {
+      "lens": "aspheric_singlet",
+      "rays": 952,
+      "surfaces": 3,
+      "seconds": {
+        "optiland_numpy@1t": 0.0024405219999152905,
+        "numba_fused@1t": 0.0001821210000798601,
+        "numba_fused@4t": 6.961700000829296e-05,
+        "rust_fused@1t": 0.00016621899999336165,
+        "rust_fused@4t": 0.00013453699989440793
+      }
+    },
+    {
+      "lens": "aspheric_singlet",
+      "rays": 9845,
+      "surfaces": 3,
+      "seconds": {
+        "optiland_numpy@1t": 0.00419825399990259,
+        "numba_fused@1t": 0.0018444909999288939,
+        "numba_fused@4t": 0.0005583360000400717,
+        "rust_fused@1t": 0.0018110460000571038,
+        "rust_fused@4t": 0.0007057489999624522
+      }
+    },
+    {
+      "lens": "aspheric_singlet",
+      "rays": 99477,
+      "surfaces": 3,
+      "seconds": {
+        "optiland_numpy@1t": 0.046599728000046525,
+        "numba_fused@1t": 0.01917950100005328,
+        "numba_fused@4t": 0.007017402999963451,
+        "rust_fused@1t": 0.01881599900002584,
+        "rust_fused@4t": 0.005971490000092672
+      }
+    },
+    {
+      "lens": "aspheric_singlet",
+      "rays": 999289,
+      "surfaces": 3,
+      "seconds": {
+        "optiland_numpy@1t": 0.73125853800002,
+        "numba_fused@1t": 0.19013272199981657,
+        "numba_fused@4t": 0.0633712450000985,
+        "rust_fused@1t": 0.187191686999995,
+        "rust_fused@4t": 0.05527701799996976
+      }
+    },
+    {
+      "lens": "aspheric_double_gauss",
+      "rays": 952,
+      "surfaces": 12,
+      "seconds": {
+        "optiland_numpy@1t": 0.011665427999787426,
+        "numba_fused@1t": 0.001211068999964482,
+        "numba_fused@4t": 0.0004432059999999183,
+        "rust_fused@1t": 0.0012215839999498712,
+        "rust_fused@4t": 0.0007914770001207216
+      }
+    },
+    {
+      "lens": "aspheric_double_gauss",
+      "rays": 9845,
+      "surfaces": 12,
+      "seconds": {
+        "optiland_numpy@1t": 0.021399047999921095,
+        "numba_fused@1t": 0.01249988199992913,
+        "numba_fused@4t": 0.003323869000041668,
+        "rust_fused@1t": 0.012367074999929173,
+        "rust_fused@4t": 0.0035075559999313555
+      }
+    },
+    {
+      "lens": "aspheric_double_gauss",
+      "rays": 99477,
+      "surfaces": 12,
+      "seconds": {
+        "optiland_numpy@1t": 0.29987906800010933,
+        "numba_fused@1t": 0.13039083200010282,
+        "numba_fused@4t": 0.03895260000012968,
+        "rust_fused@1t": 0.12838785600001756,
+        "rust_fused@4t": 0.03470406799988268
+      }
+    },
+    {
+      "lens": "aspheric_double_gauss",
+      "rays": 999289,
+      "surfaces": 12,
+      "seconds": {
+        "optiland_numpy@1t": 4.376951200000121,
+        "numba_fused@1t": 1.3044673510000848,
+        "numba_fused@4t": 0.34023803400009456,
+        "rust_fused@1t": 1.3022656929999812,
+        "rust_fused@4t": 0.3320055499998489
+      }
+    }
+  ],
+  "fft": [
+    {
+      "size": 256,
+      "seconds": {
+        "numpy_pocketfft@1t": 0.0007192189998477261,
+        "scipy_fft@1t": 0.0006549789998189226,
+        "scipy_fft@4t": 0.0003885200001150224,
+        "rustfft@1t": 0.0006837329999598296,
+        "rustfft@4t": 0.0005758459999469778
+      }
+    },
+    {
+      "size": 512,
+      "seconds": {
+        "numpy_pocketfft@1t": 0.004068071999881795,
+        "scipy_fft@1t": 0.003340664999996079,
+        "scipy_fft@4t": 0.002258175999941159,
+        "rustfft@1t": 0.003876994999927774,
+        "rustfft@4t": 0.002142938999895705
+      }
+    },
+    {
+      "size": 1024,
+      "seconds": {
+        "numpy_pocketfft@1t": 0.0231275660000847,
+        "scipy_fft@1t": 0.022433584999816958,
+        "scipy_fft@4t": 0.007747257999881185,
+        "rustfft@1t": 0.02054561299996749,
+        "rustfft@4t": 0.007698855999933585
+      }
+    },
+    {
+      "size": 2048,
+      "seconds": {
+        "numpy_pocketfft@1t": 0.14310932800003684,
+        "scipy_fft@1t": 0.1353634659999443,
+        "scipy_fft@4t": 0.03941343300016342,
+        "rustfft@1t": 0.17526825100003407,
+        "rustfft@4t": 0.06338807700012694
+      }
+    }
+  ],
+  "end_to_end": [
+    {
+      "workload": "ScalarHuygensPSF, 128 rays, 128px image",
+      "stock": 3.060477738999907,
+      "rust": 0.8863748730000225
+    },
+    {
+      "workload": "double_gauss.trace, 205,012 rays",
+      "stock": 0.4362236319998374,
+      "rust": 0.14940268399959677
+    },
+    {
+      "workload": "aspheric_double_gauss.trace, 205,012 rays",
+      "stock": 0.7066965239996534,
+      "rust": 0.17531296599963753
+    }
+  ]
+}
